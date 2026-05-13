@@ -3,7 +3,7 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["alpha_calc"]
+packages = ["knitting_pattern"]
 
 [project]
 name = "knitting_pattern"
