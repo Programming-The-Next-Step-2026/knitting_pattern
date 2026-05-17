@@ -1,0 +1,1 @@
+from knitting_pattern import add, calculate_meandef test_add_positive_numbers():    assert add(2, 3) == 5def test_add_negative_numbers():    assert add(-1, -1) == -2def test_calculate_mean_standard():    assert calculate_mean([1, 2, 3, 4, 5]) == 3.0def test_calculate_mean_single_value():    assert calculate_mean([10]) == 10.0
