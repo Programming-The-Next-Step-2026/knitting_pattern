@@ -136,7 +136,7 @@ def get_shaping_guidelines(size_string):
     }
     return guidelines.get(size_string.upper(), guidelines["M"])
 
-def calculate_top_down_shoulder_shaping(total_chest_sts, size_string, gauge_rows_per_10cm):
+def calculate_top_down_shoulder_shaping(total_chest_sts, size_string, gauge_rows_per_10cm, panel_type="Front Panel"):
     """
     Calculates the short row intervals for top-down 'two mountain' shoulder shaping.
 
@@ -144,25 +144,22 @@ def calculate_top_down_shoulder_shaping(total_chest_sts, size_string, gauge_rows
         total_chest_sts (int): The total cast-on width for the panel.
         size_string (str): The body size, used to pull dynamic drop guidelines.
         gauge_rows_per_10cm (float): The knitter's row gauge.
-
-    Returns:
-        dict: Instructions containing total steps, anchor stitches, and progression rates.
+        panel_type (str): "Front Panel" or "Back Panel".
     """
     shaping_rules = get_shaping_guidelines(size_string)
-    slope_drop_cm = shaping_rules["shoulder_drop_cm"]
+    
+    if panel_type == "Front Panel":
+        slope_drop_cm = shaping_rules["shoulder_drop_cm"]
+    else:
+        slope_drop_cm = shaping_rules["back_neck_raise_cm"]
 
-    # 1. Define the anchor points
     quarter_mark = total_chest_sts // 4
     middle_mark = total_chest_sts // 2
     
-    # 2. Calculate row height of the "mountain"
     rows_per_cm = gauge_rows_per_10cm / 10.0
     mountain_rows = math.ceil(slope_drop_cm * rows_per_cm)
-    
-    # 3. Short row steps (pairs of rows)
     steps = max(1, mountain_rows // 2)
     
-    # 4. Calculate stitch progression
     distance_to_cover = middle_mark - quarter_mark
     sts_per_step = distance_to_cover // steps
     
@@ -173,7 +170,51 @@ def calculate_top_down_shoulder_shaping(total_chest_sts, size_string, gauge_rows
         "middle_stitch": middle_mark,
         "sts_to_knit_past_double_stitch": sts_per_step
     }
+def calculate_back_neck_shaping(total_chest_sts, size_string, gauge_rows_per_10cm):
+    shaping_rules = get_shaping_guidelines(size_string)
+    raise_cm = shaping_rules["back_neck_raise_cm"]
+    
+    rows_per_cm = gauge_rows_per_10cm / 10.0
+    mountain_rows = math.ceil(raise_cm * rows_per_cm)
+    steps = max(1, mountain_rows // 2)
+    
+    middle_mark = total_chest_sts // 2
+    neck_half_width = total_chest_sts // 6 
+    
+    shoulder_sts = (total_chest_sts // 2) - neck_half_width
+    sts_per_step = max(1, shoulder_sts // steps)
+    
+    return {
+        "mountain_rows": mountain_rows,
+        "total_short_row_steps": steps,
+        "middle_stitch": middle_mark,
+        "neck_half_width": neck_half_width,
+        "sts_per_step": sts_per_step
+    }
 
+def apply_back_short_rows_to_grid(grid, shaping_data):
+    steps = shaping_data["total_short_row_steps"]
+    middle = shaping_data["middle_stitch"]
+    neck_half_width = shaping_data["neck_half_width"]
+    sts_per_step = shaping_data["sts_per_step"]
+    total_sts = len(grid[0])
+    
+    for step in range(steps):
+        live_left_edge = middle - neck_half_width - (step * sts_per_step)
+        live_right_edge = middle + neck_half_width + (step * sts_per_step)
+        
+        r1 = step * 2
+        r2 = step * 2 + 1
+        
+        if r1 < len(grid):
+            for col in range(0, live_left_edge): grid[r1][col] = -1
+            for col in range(live_right_edge, total_sts): grid[r1][col] = -1
+            
+        if r2 < len(grid):
+            for col in range(0, live_left_edge): grid[r2][col] = -1
+            for col in range(live_right_edge, total_sts): grid[r2][col] = -1
+
+    return grid
 # ==========================================
 # 4. GRID GENERATION (THE CANVAS)
 # ==========================================

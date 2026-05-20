@@ -23,28 +23,24 @@ def get_hardcoded_heart():
         [0, 0, 1, 1, 1, 0, 0],
         [0, 0, 0, 1, 0, 0, 0]
     ]
-def scale_pattern_matrix(original_matrix, target_width_sts, target_height_rows):
+def scale_pattern_matrix_integer(original_matrix, multiplier):
     """
-    Stretches or shrinks a 2D array (alpha pattern) to match the required 
-    number of stitches and rows. Uses nearest-neighbor interpolation.
+    Scales a 2D array by an exact integer multiplier to preserve crisp pixel art.
+    A multiplier of 2 turns every 1x1 pixel into a 2x2 block of stitches.
     """
-    orig_height = len(original_matrix)
-    orig_width = len(original_matrix[0])
-    
     scaled_matrix = []
     
-    for y in range(target_height_rows):
-        new_row = []
-        for x in range(target_width_sts):
-            # Find the corresponding pixel in the original tiny image
-            orig_y = int((y / target_height_rows) * orig_height)
-            orig_x = int((x / target_width_sts) * orig_width)
+    for row in original_matrix:
+        # Step 1: Duplicate horizontally (columns)
+        scaled_row = []
+        for pixel in row:
+            scaled_row.extend([pixel] * int(multiplier))
             
-            # Copy that pixel's color
-            new_row.append(original_matrix[orig_y][orig_x])
+        # Step 2: Duplicate vertically (rows)
+        for _ in range(int(multiplier)):
+            # We append a copy() so we don't accidentally link the memory of the rows!
+            scaled_matrix.append(scaled_row.copy()) 
             
-        scaled_matrix.append(new_row)
-        
     return scaled_matrix
 
 def overlay_pattern_on_grid(sweater_grid, alpha_matrix, start_x, start_y):
