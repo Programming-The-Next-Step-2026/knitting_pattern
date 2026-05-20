@@ -1,19 +1,7 @@
-# Python cache files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Virtual environments
 venv/
 env/
 .venv/
-
-# Environment variables (keep your API keys/secrets safe!)
-.env
-
-# OS generated files
 .DS_Store
-Thumbs.db
-
-# Project specific
-*.alpha  # (If you create a custom file extension for your alpha patterns later)
