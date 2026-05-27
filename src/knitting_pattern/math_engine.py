@@ -168,7 +168,7 @@ def calculate_top_down_shoulder_shaping(total_chest_sts, size_string, gauge_rows
         "total_short_row_steps": steps,
         "first_turn_stitch": quarter_mark,
         "middle_stitch": middle_mark,
-        "sts_to_knit_past_double_stitch": sts_per_step
+        "sts_per_step": sts_per_step
     }
 def calculate_back_neck_shaping(total_chest_sts, size_string, gauge_rows_per_10cm):
     shaping_rules = get_shaping_guidelines(size_string)
@@ -189,7 +189,8 @@ def calculate_back_neck_shaping(total_chest_sts, size_string, gauge_rows_per_10c
         "total_short_row_steps": steps,
         "middle_stitch": middle_mark,
         "neck_half_width": neck_half_width,
-        "sts_per_step": sts_per_step
+        "sts_per_step": sts_per_step,
+        "first_turn_stitch": middle_mark + neck_half_width
     }
 
 def apply_back_short_rows_to_grid(grid, shaping_data):
@@ -239,7 +240,7 @@ def apply_top_down_mountains_to_grid(grid, shaping_data):
     """
     steps = shaping_data["total_short_row_steps"]
     quarter = shaping_data["first_turn_stitch"]
-    sts_per_step = shaping_data["sts_to_knit_past_double_stitch"]
+    sts_per_step = shaping_data["sts_per_step"]
     
     total_sts = len(grid[0])
     midpoint = total_sts // 2

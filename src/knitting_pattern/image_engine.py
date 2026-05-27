@@ -8,6 +8,10 @@ Created on Sun May 17 21:38:58 2026
 
 # knitting_pattern/image_engine.py
 import copy
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from PIL import Image, ImageDraw
 
 def get_hardcoded_heart():
     """
@@ -77,130 +81,206 @@ def overlay_pattern_on_grid(sweater_grid, alpha_matrix, start_x, start_y):
                         
     return result_grid
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-
-def generate_chart_image(matrix, shaping_data, filename="knitting_chart.png"):
+def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint", rows_per_page=60):
+    figs = []
+    
     # 1. INJECT THE CAST-ON EDGE
-    # We change every physical stitch in Row 0 to a '2' so we can color it differently
     for x in range(len(matrix[0])):
-        if matrix[0][x] != -1: # As long as it's a real stitch
+        if matrix[0][x] != -1: 
             matrix[0][x] = 2
 
-    # 2. SET UP THE COLORS
-    # -1: White (Empty Space)
-    #  0: Light Gray (Main Yarn)
-    #  1: Red (Heart/Contrast Yarn)
-    #  2: Gold (The Cast-On Swoop!)
-    data = np.array(matrix)
-    cmap = ListedColormap(['white', '#E0E0E0', '#FF4B4B', '#FFB000'])
-    
-    fig, ax = plt.subplots(figsize=(14, 10))
-    cax = ax.imshow(data, cmap=cmap, vmin=-1, vmax=2)
-    
-    # 3. DRAW THE GRID
     total_rows = len(matrix)
     total_sts = len(matrix[0])
     
-    ax.set_xticks(np.arange(-.5, total_sts, 1), minor=True)
-    ax.set_yticks(np.arange(-.5, total_rows, 1), minor=True)
-    ax.grid(which="minor", color="black", linestyle='-', linewidth=0.5)
-    ax.tick_params(which="minor", size=0) 
-    
-    # Hide the standard math axes
-    ax.set_xticks([])
-    ax.set_yticks([])
-    
     # ==========================================
-    # 4. PROFESSIONAL RS/WS CHART NUMBERING
+    # PAGE 1: THE COVER & INSTRUCTION PAGE
     # ==========================================
+    fig_cover, ax_cover = plt.subplots(figsize=(11, 8.5))
+    ax_cover.axis('off')
+    ax_cover.set_facecolor('#F9F9F9')
     
-    # We loop through every row. Odd rows get RS labels on the right. Even rows get WS labels on the left.
-    for y in range(total_rows):
-        # Only label every other row or specific intervals to avoid clutter, 
-        # but let's do the first few specifically for the short rows!
-        if y == 0:
-            ax.text(total_sts, y, "CO (WS)", va='center', ha='left', fontsize=9, fontweight='bold', color='#FFB000')
-        elif y % 2 != 0: # Odd rows (Right Side)
-            ax.text(total_sts, y, f"Row {y} (RS)", va='center', ha='left', fontsize=8, color='black')
-        else:            # Even rows (Wrong Side)
-            ax.text(-0.5, y, f"(WS) Row {y}", va='center', ha='right', fontsize=8, color='black')
+    co_sts = sum(1 for st in matrix[0] if st != -1)
+    pattern_row = next((y for y, row in enumerate(matrix) if 1 in row), None)
+    pattern_str = f"Row {pattern_row}" if pattern_row else "None included"
+
+    if shaping_data and "mountain_rows" in shaping_data:
+        first_turn = shaping_data.get("first_turn_stitch", "?")
+        steps = shaping_data.get("total_short_row_steps", 1)
+        sts_per_step = shaping_data.get("sts_per_step", "?")
+        straight_rows = total_rows - shaping_data["mountain_rows"]
+        
+        instructions = (
+            f"🧶 {title.upper()}\n"
+            "════════════════════════════════════════\n\n"
+            "OVERALL SPECS:\n"
+            f"• Cast On: {co_sts} sts\n"
+            f"• Total Length: {total_rows} rows\n"
+            f"• Colorwork Starts: {pattern_str}\n\n"
+            
+            "⛰️ SHORT ROW SHAPING\n"
+            "Grey blocks represent empty space (no stitches knitted).\n\n"
+            
+            "RIGHT SHOULDER (Row 1):\n"
+            f"• Work {first_turn} sts, turn.\n"
+            f"• Next {steps - 1} turns: Work {sts_per_step} sts past last turn.\n\n"
+            
+            "LEFT SHOULDER (Row 2):\n"
+            f"• Work {first_turn} sts, turn.\n"
+            f"• Next {steps - 1} turns: Work {sts_per_step} sts past last turn.\n\n"
+            
+            "BODY PANEL:\n"
+            f"• Work even for {straight_rows} rows."
+        )
+    else:
+        instructions = (
+            f"🧶 {title.upper()}\n"
+            "════════════════════════════════════════\n\n"
+            "OVERALL SPECS:\n"
+            f"• Cast On: {co_sts} sts\n"
+            f"• Total Length: {total_rows} rows\n"
+            f"• Colorwork Starts: {pattern_str}\n\n"
+            "• Short row shaping is disabled for this panel."
+        )
+        
+    ax_cover.text(0.5, 0.6, instructions, va='center', ha='center', 
+                  fontsize=14, color='#222222', linespacing=1.8, fontfamily='sans-serif')
+    
+    figs.append(fig_cover)
 
     # ==========================================
-    # 5. ANNOTATING THE ASYMMETRIC TIMELINE
+    # PAGES 2+: SLICING THE CHART INTO CHUNKS
     # ==========================================
-    mountain_rows = shaping_data["mountain_rows"]
-    total_sts = len(matrix[0])
-    midpoint = total_sts // 2
+    cmap = ListedColormap(['#C0C0C0', 'white', '#FF4B4B', '#FFB000'])
     
-    # 1. REMOVED the heavy black hlines/vlines!
-    # Instead, we just draw a very subtle dashed line to show the physical boundary 
-    # without making it look like a brick wall.
-    ax.hlines(y=mountain_rows + 0.5, xmin=midpoint, xmax=total_sts - 0.5, color='gray', linewidth=1, linestyle=':')
-    ax.hlines(y=mountain_rows + 1.5, xmin=-0.5, xmax=midpoint, color='gray', linewidth=1, linestyle=':')
+    for chunk_start in range(0, total_rows, rows_per_page):
+        chunk_end = min(chunk_start + rows_per_page, total_rows)
+        chunk_matrix = matrix[chunk_start:chunk_end]
+        chunk_height = len(chunk_matrix)
+        
+        fig, ax = plt.subplots(figsize=(11, 8.5))
+        ax.imshow(chunk_matrix, cmap=cmap, vmin=-1, vmax=2)
+        
+        # 1. SOFT BASE GRID (The light background cells)
+        ax.set_xticks(np.arange(-.5, total_sts, 1), minor=True)
+        ax.set_yticks(np.arange(-.5, chunk_height, 1), minor=True)
+        ax.grid(which="minor", color="#B0B0B0", linestyle='-', linewidth=0.5) 
+        ax.tick_params(which="minor", size=0) 
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        # 2. SUDOKU BLOCKS (Heavy lines every 5 blocks)
+        sudoku_col='#595959'
+        # Outer Bounding Box
+        ax.axvline(-0.5, color=sudoku_col, linewidth=2)
+        ax.axvline(total_sts - 0.5, color=sudoku_col, linewidth=2)
+        ax.axhline(-0.5, color=sudoku_col, linewidth=2)
+        ax.axhline(chunk_height - 0.5, color=sudoku_col, linewidth=2)
+        
+        # Heavy Vertical Lines (Boxing every 5 stitches left-to-right)
+        for x in range(total_sts):
+            if (x + 1) % 5 == 0 and (x + 1) < total_sts:
+                ax.axvline(x + 0.5, color=sudoku_col, linewidth=1.5)
+                
+        # Heavy Horizontal Lines (Absolute tracking across chunks)
+        for local_y in range(chunk_height):
+            abs_y = chunk_start + local_y
+            if abs_y % 5 == 0 and abs_y != 0:
+                ax.axhline(local_y - 0.5, color=sudoku_col, linewidth=1.5)
+        
+        # 3. STITCH NUMBERING (Now reads 1, 2, 3... from Left to Right)
+        for x in range(total_sts):
+            stitch_num = x + 1
+            # Print the number on the 1st stitch and every 5th stitch
+            if stitch_num == 1 or stitch_num % 5 == 0:
+                # Top Label
+                ax.text(x, -0.8, str(stitch_num), va='bottom', ha='center', fontsize=8, color='#444444', fontweight='bold')
+                # Bottom Label
+                ax.text(x, chunk_height - 0.2, str(stitch_num), va='top', ha='center', fontsize=8, color='#444444', fontweight='bold')
 
-    # 2. Add a VERTICAL ARROW to guide the eye straight up to Row 1
-    # First, we draw just the arrow itself (no text attached) so it perfectly traces the midpoint
-    ax.annotate('', 
-                xy=(midpoint, 1), xycoords='data', 
-                xytext=(midpoint, mountain_rows - 0.5), textcoords='data', 
-                arrowprops=dict(arrowstyle="->,head_length=0.8,head_width=0.4", 
-                                color="blue", lw=2.5, ls="--"))
-                                
-    # Second, we place the text box slightly to the RIGHT of the arrow shaft (midpoint + 1.5)
-    ax.text(midpoint + 1.5, mountain_rows / 2, 
-            'Yarn continues\nto Row 1', 
-            ha='left', va='center', color='blue', fontsize=10, fontweight='bold',
-            bbox=dict(facecolor='white', alpha=0.9, edgecolor='blue', boxstyle='round,pad=0.3'))
+        # 4. ROW NUMBERING (With explicit RS/WS and moved Cast-On)
+        for local_y in range(chunk_height):
+            abs_y = chunk_start + local_y
+            
+            if abs_y == 0:
+                # Moved to the left side (-1.0) 
+                ax.text(-1.0, local_y, "CO (WS)", va='center', ha='right', fontsize=9, fontweight='bold', color='#FFB000')
+            elif abs_y <= 4 or abs_y % 5 == 0: 
+                if abs_y % 2 != 0: 
+                    # Odd Rows are RS: Label stays on the Right
+                    ax.text(total_sts + 0.5, local_y, f"Row {abs_y} (RS)", va='center', ha='left', fontsize=8, color='#333333', fontweight='bold')
+                else:          
+                    # Even Rows are WS: Label explicitly moved to the Left
+                    ax.text(-1.0, local_y, f"Row {abs_y} (WS)", va='center', ha='right', fontsize=8, color='#333333', fontweight='bold')
+
+        # 5. ASYMMETRICAL MOUNTAIN ARROW (If on this chunk)
+        if shaping_data and "mountain_rows" in shaping_data:
+            m_row = shaping_data["mountain_rows"]
+            
+            if chunk_start <= m_row < chunk_end:
+                local_m_row = m_row - chunk_start
+                midpoint = total_sts // 2
+                
+                # We use the bold sudoku lines now, so just draw the yarn jump arrow!
+                ax.annotate('', 
+                            xy=(midpoint, 1 - chunk_start), xycoords='data', 
+                            xytext=(midpoint, local_m_row - 0.5), textcoords='data', 
+                            arrowprops=dict(arrowstyle="->,head_length=0.8,head_width=0.4", 
+                                            color="#0055A4", lw=2, ls="--"))
+
+        ax.set_title(f"{title} — Rows {chunk_start} to {chunk_end - 1}", pad=25, fontsize=12, fontweight='bold', color='#555555')
+        plt.tight_layout()
+        figs.append(fig)
+        
+    return figs
+
+def process_uploaded_image(pil_image, target_width, threshold_value):
+    """Converts an uploaded image into a binary matrix and a visual graph-paper preview."""
     
-    # Point out the Right Shoulder
-    ax.text(total_sts - (shaping_data["first_turn_stitch"] / 2), mountain_rows / 2, 
-            "Right Shoulder\n(Starts Row 1)", 
-            ha="center", va="center", color="black", fontweight="bold", 
-            bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', boxstyle='round,pad=0.5'))
+    # 1. FIX TRANSPARENCY
+    if pil_image.mode in ('RGBA', 'LA') or (pil_image.mode == 'P' and 'transparency' in pil_image.info):
+        bg = Image.new('RGBA', pil_image.size, (255, 255, 255, 255))
+        pil_image = Image.alpha_composite(bg, pil_image.convert('RGBA'))
 
-    # Point out the Left Shoulder
-    ax.text(shaping_data["first_turn_stitch"] / 2, (mountain_rows / 2) + 0.5, 
-            "Left Shoulder\n(Starts Row 2)", 
-            ha="center", va="center", color="black", fontweight="bold", 
-            bbox=dict(facecolor='white', alpha=0.8, edgecolor='black', boxstyle='round,pad=0.5'))
-
-    ax.set_title("Advanced Top-Down Panel: Asymmetrical Short Row Chart", pad=20, fontsize=16, fontweight='bold')
+    # 2. CALCULATE EXACT HEIGHT
+    aspect_ratio = pil_image.height / pil_image.width
+    target_height = int(target_width * aspect_ratio)
     
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    print(f"Professional chart successfully saved as {filename}!")
-
-#%%
-# --- TESTING BLOCK ---
-if __name__ == "__main__":
-    from knitting_pattern.math_engine import (
-        calculate_stitches, calculate_rows, calculate_garment_dimensions, 
-        calculate_top_down_shoulder_shaping, generate_panel_grid, apply_top_down_mountains_to_grid
-    )
-
-    my_gauge_sts = 18
-    my_gauge_rows = 24
+    # 3. BOX RESAMPLING
+    if hasattr(Image, 'Resampling'):
+        pil_image = pil_image.resize((target_width, target_height), Image.Resampling.BOX)
+    else:
+        pil_image = pil_image.resize((target_width, target_height), Image.BOX)
+        
+    gray = pil_image.convert('L')
+    arr = np.array(gray)
     
-    dimensions = calculate_garment_dimensions("M", "drop_shoulder")
-    total_sweater_sts = calculate_stitches(dimensions["panel_width_cm"], my_gauge_sts)
-    sweater_grid = generate_panel_grid(total_sweater_sts, 50) 
+    # 4. THRESHOLD MATH
+    matrix = [[1 if val < threshold_value else 0 for val in row] for row in arr]
     
-    shaping = calculate_top_down_shoulder_shaping(total_sweater_sts, "M", my_gauge_rows)
-    carved_grid = apply_top_down_mountains_to_grid(sweater_grid, shaping)
-
-    tiny_heart = get_hardcoded_heart()
-    heart_sts = calculate_stitches(15.0, my_gauge_sts)
-    heart_rows = calculate_rows(15.0, my_gauge_rows)   
-
-    giant_heart = scale_pattern_matrix(tiny_heart, heart_sts, heart_rows)
-
-    start_x = (total_sweater_sts - heart_sts) // 2
-    start_y = 12 
+    # 5. BUILD THE HIGH-CONTRAST PREVIEW IMAGE
+    # 0 = Black (Pattern), 255 = White (Background)
+    preview_arr = np.array([[0 if val == 1 else 255 for val in row] for row in matrix], dtype=np.uint8)
+    preview_img = Image.fromarray(preview_arr)
     
-    final_chart = overlay_pattern_on_grid(carved_grid, giant_heart, start_x, start_y)
+    # Convert to RGB so we can draw colored/gray grid lines on it!
+    preview_img = preview_img.convert("RGB")
     
-    # INSTEAD OF PRINTING TO TERMINAL, WE GENERATE THE IMAGE!
-    # Update this line at the bottom of your test block!
-    generate_chart_image(final_chart, shaping, "my_first_sweater_chart.png")
+    # Scale it up by 10x
+    cell_size = 10
+    preview_img = preview_img.resize((target_width * cell_size, target_height * cell_size), Image.NEAREST)
     
+    # 6. DRAW THE GRAPH PAPER GRID
+    draw = ImageDraw.Draw(preview_img)
+    grid_color = (130, 130, 130) # Matching slate gray
+    
+    # Draw vertical grid lines
+    for x in range(0, preview_img.width, cell_size):
+        draw.line([(x, 0), (x, preview_img.height)], fill=grid_color, width=1)
+    # Draw horizontal grid lines
+    for y in range(0, preview_img.height, cell_size):
+        draw.line([(0, y), (preview_img.width, y)], fill=grid_color, width=1)
+        
+    # Draw a thick bounding box around the whole thing
+    draw.rectangle([(0, 0), (preview_img.width-1, preview_img.height-1)], outline=grid_color, width=2)
+    
+    return matrix, preview_img
