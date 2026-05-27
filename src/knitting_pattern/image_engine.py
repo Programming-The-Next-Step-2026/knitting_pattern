@@ -5,82 +5,129 @@ Created on Sun May 17 21:38:58 2026
 
 @author: kasteivanauskaite
 """
-
-# knitting_pattern/image_engine.py
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from PIL import Image, ImageDraw
+import io
 
 def get_hardcoded_heart():
-    """
-    Returns a small 2D matrix representing a heart.
-    0 = Background yarn
-    1 = Contrast color yarn
-    """
-    return [
-        [0, 1, 1, 0, 1, 1, 0],
-        [1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1],
-        [0, 1, 1, 1, 1, 1, 0],
-        [0, 0, 1, 1, 1, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0]
-    ]
+    return [[0, 1, 1, 0, 1, 1, 0],
+            [1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1],
+            [0, 1, 1, 1, 1, 1, 0],
+            [0, 0, 1, 1, 1, 0, 0],
+            [0, 0, 0, 1, 0, 0, 0]]
+
 def scale_pattern_matrix_integer(original_matrix, multiplier):
-    """
-    Scales a 2D array by an exact integer multiplier to preserve crisp pixel art.
-    A multiplier of 2 turns every 1x1 pixel into a 2x2 block of stitches.
-    """
+    if multiplier <= 1: return original_matrix
     scaled_matrix = []
-    
     for row in original_matrix:
-        # Step 1: Duplicate horizontally (columns)
         scaled_row = []
-        for pixel in row:
-            scaled_row.extend([pixel] * int(multiplier))
-            
-        # Step 2: Duplicate vertically (rows)
-        for _ in range(int(multiplier)):
-            # We append a copy() so we don't accidentally link the memory of the rows!
-            scaled_matrix.append(scaled_row.copy()) 
-            
+        for pixel in row: scaled_row.extend([pixel] * int(multiplier))
+        for _ in range(int(multiplier)): scaled_matrix.append(scaled_row.copy()) 
     return scaled_matrix
 
-def overlay_pattern_on_grid(sweater_grid, alpha_matrix, start_x, start_y):
-    """
-    Places the alpha pattern onto the main sweater grid.
-    Prevents the pattern from printing onto carved short-row areas (-1).
-    """
-    # Create a copy so we don't accidentally ruin our blank canvas
-    result_grid = copy.deepcopy(sweater_grid)
-    
-    pattern_height = len(alpha_matrix)
-    pattern_width = len(alpha_matrix[0])
-    
-    sweater_height = len(result_grid)
-    sweater_width = len(result_grid[0])
+def rotate_matrix(matrix, degrees):
+    if degrees == 0 or not matrix: return matrix
+    arr = np.array(matrix)
+    k_map = {90: -1, 180: 2, 270: 1}
+    return np.rot90(arr, k=k_map.get(degrees, 0)).tolist()
 
-    # Loop through every pixel in our little heart graphic
-    for p_y in range(pattern_height):
-        for p_x in range(pattern_width):
-            
-            # Calculate exactly where this pixel lands on the giant sweater grid
-            target_x = start_x + p_x
-            target_y = start_y + p_y
-            
-            # 1. BOUNDARY CHECK: Does it fall off the right or bottom edges?
-            if target_x < sweater_width and target_y < sweater_height:
-                
-                # 2. CARVING CHECK: Is this stitch a physical part of the sweater?
-                if result_grid[target_y][target_x] != -1:
-                    
-                    # 3. COLOR CHECK: Only print the contrast color (1), ignore the graphic's background (0)
-                    if alpha_matrix[p_y][p_x] != 0:
-                        result_grid[target_y][target_x] = alpha_matrix[p_y][p_x]
-                        
-    return result_grid
+def get_matrix_dimensions(matrix, t_type, axis, spacing_h=0, spacing_v=0):
+    if t_type == "None" or not matrix: return len(matrix[0]), len(matrix)
+    h, w = len(matrix), len(matrix[0])
+    m = 2 if t_type == "Mirror" else 1
+    
+    new_w = w
+    if axis in ["Horizontal", "Quadratic"]:
+        overlap_w = min(abs(spacing_h), w) if spacing_h < 0 else 0
+        gap_w = spacing_h if spacing_h > 0 else 0
+        new_w = (w * m) + gap_w - overlap_w
+        
+    new_h = h
+    if axis in ["Vertical", "Quadratic"]:
+        overlap_h = min(abs(spacing_v), h) if spacing_v < 0 else 0
+        gap_h = spacing_v if spacing_v > 0 else 0
+        new_h = (h * m) + gap_h - overlap_h
+        
+    return new_w, new_h
 
+def apply_transforms(matrix, t_type, axis, spacing_h=0, spacing_v=0):
+    t_type = t_type.capitalize()
+    if t_type == "None" or not matrix: return matrix
+    arr = np.array(matrix)
+    
+    if t_type == "Flip":
+        if axis == "Horizontal": return arr[:, ::-1].tolist()
+        if axis == "Vertical": return arr[::-1, :].tolist()
+        if axis == "Quadratic": return arr[::-1, ::-1].tolist()
+        
+    if t_type == "Mirror":
+        def add_gap(m, ax, s):
+            side2 = m[:, ::-1] if ax == 1 else m[::-1, :]
+            
+            if s >= 0:
+                gap = np.zeros((len(m), s), dtype=int) if ax == 1 else np.zeros((s, len(m[0])), dtype=int)
+                return np.concatenate((m, gap, side2), axis=ax)
+            else:
+                overlap = min(abs(s), m.shape[1] if ax == 1 else m.shape[0])
+                if ax == 1: 
+                    w = m.shape[1]
+                    new_w = (2 * w) - overlap
+                    canvas = np.zeros((m.shape[0], new_w), dtype=int)
+                    canvas[:, :w] = np.maximum(canvas[:, :w], m)
+                    canvas[:, new_w-w:] = np.maximum(canvas[:, new_w-w:], side2)
+                    return canvas
+                else: 
+                    h = m.shape[0]
+                    new_h = (2 * h) - overlap
+                    canvas = np.zeros((new_h, m.shape[1]), dtype=int)
+                    canvas[:h, :] = np.maximum(canvas[:h, :], m)
+                    canvas[new_h-h:, :] = np.maximum(canvas[new_h-h:, :], side2)
+                    return canvas
+
+        if axis == "Horizontal": return add_gap(arr, 1, spacing_h).tolist()
+        if axis == "Vertical": return add_gap(arr, 0, spacing_v).tolist()
+        if axis == "Quadratic": return add_gap(np.array(add_gap(arr, 1, spacing_h)), 0, spacing_v).tolist()
+        
+    return matrix.tolist()
+
+def overlay_stamps_on_grid(sweater_grid, stamps):
+    res = np.array(copy.deepcopy(sweater_grid))
+    grid_h, grid_w = res.shape
+
+    for stamp in stamps:
+        base_matrix = stamp.get("matrix")
+        if not base_matrix: continue
+        
+        final_stamp = rotate_matrix(base_matrix, stamp.get("rotation", 0))
+        # Pass both spacing_h and spacing_v
+        final_stamp = apply_transforms(final_stamp, stamp.get("symmetry", "None"), stamp.get("axis", "Horizontal"), stamp.get("spacing_h", 0), stamp.get("spacing_v", 0))
+        final_stamp = scale_pattern_matrix_integer(final_stamp, stamp.get("scale", 1))
+        
+        final_arr = np.array(final_stamp)
+        start_x, start_y = stamp.get("x", 0), stamp.get("y", 0)
+        h, w = final_arr.shape
+        
+        y_min, y_max = max(0, start_y), min(grid_h, start_y + h)
+        x_min, x_max = max(0, start_x), min(grid_w, start_x + w)
+        
+        if y_min >= y_max or x_min >= x_max: continue
+        
+        stamp_y_min, stamp_x_min = y_min - start_y, x_min - start_x
+        stamp_y_max, stamp_x_max = stamp_y_min + (y_max - y_min), stamp_x_min + (x_max - x_min)
+        
+        stamp_crop = final_arr[stamp_y_min:stamp_y_max, stamp_x_min:stamp_x_max]
+        grid_crop = res[y_min:y_max, x_min:x_max]
+        
+        mask = (grid_crop != -1) & (stamp_crop != 0)
+        grid_crop[mask] = stamp_crop[mask]
+        
+    return res.tolist()
+
+# ... (Keep your generate_multipage_pdf_figs and process_uploaded_image exactly as they were below this)
 def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint", rows_per_page=60):
     figs = []
     
@@ -284,3 +331,91 @@ def process_uploaded_image(pil_image, target_width, threshold_value):
     draw.rectangle([(0, 0), (preview_img.width-1, preview_img.height-1)], outline=grid_color, width=2)
     
     return matrix, preview_img
+
+def generate_cropped_canvas_png_bytes(math_grid):
+    """Crops the composed canvas tightly around the pattern, adding a white background and grid."""
+    arr = np.array(math_grid)
+    # Find all coordinates where the pattern exists (1)
+    coords = np.argwhere(arr == 1)
+
+    if coords.size == 0:
+        # Fallback if canvas is empty
+        img = Image.new('RGB', (100, 100), (255, 255, 255))
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        return buf.getvalue()
+
+    # Get the bounding box of the combined pattern
+    y_min, x_min = coords.min(axis=0)
+    y_max, x_max = coords.max(axis=0)
+    cropped = arr[y_min:y_max+1, x_min:x_max+1]
+
+    # Render: 255 (White) for background, Red for pattern
+    img_arr = np.full((cropped.shape[0], cropped.shape[1], 3), 255, dtype=np.uint8)
+    img_arr[cropped == 1] = [220, 50, 50]
+
+    img = Image.fromarray(img_arr)
+    
+    # Scale up by 10x and draw grid
+    cell_size = 10
+    img = img.resize((cropped.shape[1] * cell_size, cropped.shape[0] * cell_size), Image.NEAREST)
+    draw = ImageDraw.Draw(img)
+    grid_color = (130, 130, 130)
+
+    for x in range(0, img.width, cell_size):
+        draw.line([(x, 0), (x, img.height)], fill=grid_color, width=1)
+    for y in range(0, img.height, cell_size):
+        draw.line([(0, y), (img.width, y)], fill=grid_color, width=1)
+    draw.rectangle([(0, 0), (img.width-1, img.height-1)], outline=grid_color, width=2)
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    return buf.getvalue()
+
+def merge_stamps(stamps_to_merge):
+    """Combines multiple stamps into a single matrix and calculates the new bounding box origin."""
+    if not stamps_to_merge:
+        return None, 0, 0
+        
+    stamp_data = []
+    min_x, min_y = float('inf'), float('inf')
+    max_x, max_y = float('-inf'), float('-inf')
+    
+    for stamp in stamps_to_merge:
+        base_matrix = stamp.get("matrix")
+        if not base_matrix: continue
+        
+        # Bake all transformations into the layer
+        t_mat = rotate_matrix(base_matrix, stamp.get("rotation", 0))
+        t_mat = apply_transforms(t_mat, stamp.get("symmetry", "None"), stamp.get("axis", "Horizontal"), stamp.get("spacing_h", 0), stamp.get("spacing_v", 0))
+        t_mat = scale_pattern_matrix_integer(t_mat, stamp.get("scale", 1))
+        
+        arr = np.array(t_mat)
+        h, w = arr.shape
+        sx, sy = stamp.get("x", 0), stamp.get("y", 0)
+        
+        stamp_data.append((arr, sx, sy, h, w))
+        
+        # Find the absolute edges of the combined graphic
+        min_x = min(min_x, sx)
+        min_y = min(min_y, sy)
+        max_x = max(max_x, sx + w)
+        max_y = max(max_y, sy + h)
+        
+    if not stamp_data: return None, 0, 0
+    
+    # Create a blank local canvas just big enough to hold everything
+    combined_h = max_y - min_y
+    combined_w = max_x - min_x
+    combined_canvas = np.zeros((combined_h, combined_w), dtype=int)
+    
+    # Paste everything onto the local canvas using the calculated offsets
+    for arr, sx, sy, h, w in stamp_data:
+        local_y = sy - min_y
+        local_x = sx - min_x
+        # Mask out transparent pixels so layers blend naturally
+        mask = arr != 0
+        combined_canvas[local_y:local_y+h, local_x:local_x+w][mask] = arr[mask]
+        
+    return combined_canvas.tolist(), min_x, min_y
+
