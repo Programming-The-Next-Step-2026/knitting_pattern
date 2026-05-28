@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from PIL import Image, ImageDraw
 import io
+import json
 
 def get_hardcoded_heart():
     return [[0, 1, 1, 0, 1, 1, 0],
@@ -99,6 +100,8 @@ def overlay_stamps_on_grid(sweater_grid, stamps):
     grid_h, grid_w = res.shape
 
     for stamp in stamps:
+        if not stamp.get("visible", True): continue
+    
         base_matrix = stamp.get("matrix")
         if not base_matrix: continue
         
@@ -382,6 +385,8 @@ def merge_stamps(stamps_to_merge):
     max_x, max_y = float('-inf'), float('-inf')
     
     for stamp in stamps_to_merge:
+        if not stamp.get("visible", True): continue
+    
         base_matrix = stamp.get("matrix")
         if not base_matrix: continue
         
@@ -419,3 +424,48 @@ def merge_stamps(stamps_to_merge):
         
     return combined_canvas.tolist(), min_x, min_y
 
+def crop_matrix_to_bounding_box(matrix):
+    """Crops a matrix to its tightest bounding box of 1s (for Alpha JSON exports)."""
+    if not matrix: return []
+    arr = np.array(matrix)
+    coords = np.argwhere(arr != 0)
+    
+    if coords.size == 0:
+        return arr.tolist()
+        
+    y_min, x_min = coords.min(axis=0)
+    y_max, x_max = coords.max(axis=0)
+    
+    return arr[y_min:y_max+1, x_min:x_max+1].tolist()
+
+def serialize_project_state(project_data):
+    """
+    Pure function: Converts the entire project dictionary (settings + stamps) into JSON.
+    """
+    safe_data = copy.deepcopy(project_data)
+    safe_stamps = []
+    
+    # Clean the numpy arrays out of the stamps
+    for s in safe_data.get("stamps", []):
+        if isinstance(s.get("matrix"), np.ndarray):
+            s["matrix"] = s["matrix"].tolist()
+        safe_stamps.append(s)
+        
+    safe_data["stamps"] = safe_stamps
+    return json.dumps(safe_data)
+
+def deserialize_project_state(json_string):
+    """
+    Pure function: Safely loads the project state, with backwards compatibility.
+    """
+    if not json_string:
+        return {"settings": {}, "stamps": []}
+        
+    data = json.loads(json_string)
+    
+    # Backwards compatibility: If you load an old save that was just a list of stamps, 
+    # it won't crash. It will just load the stamps and use default settings.
+    if isinstance(data, list):
+        return {"settings": {}, "stamps": data}
+        
+    return data
