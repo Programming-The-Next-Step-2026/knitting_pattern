@@ -130,8 +130,67 @@ def overlay_stamps_on_grid(sweater_grid, stamps):
         
     return res.tolist()
 
-# ... (Keep your generate_multipage_pdf_figs and process_uploaded_image exactly as they were below this)
-def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint", rows_per_page=60):
+def get_panel_instructions(panel_type, shaping, co_sts="?"):
+    """Generates the text instruction block for the PDF based on the panel type."""
+    if not shaping: shaping = {}
+        
+    if panel_type == "Front Panel":
+        first_turn = shaping.get("first_turn_stitch", "?")
+        steps = shaping.get("total_short_row_steps", 1)
+        sts_per_step = shaping.get("sts_per_step", "?")
+        next_turns = max(0, steps - 1)
+        
+        return (
+            "FRONT PANEL SHAPING (German Short Rows):\n"
+            f"Cast on {co_sts} stitches.\n"
+            "Work left and right shoulder short rows simultaneously.\n\n"
+            
+            "RIGHT SHOULDER (Row 1):\n"
+            f"• Work {first_turn} sts, turn.\n"
+            f"• Next {next_turns} turns: Work {sts_per_step} sts past last turn.\n\n"
+            
+            "LEFT SHOULDER (Row 2):\n"
+            f"• Work {first_turn} sts, turn.\n"
+            f"• Next {next_turns} turns: Work {sts_per_step} sts past last turn.\n\n"
+            
+            "BODY PANEL:\n"
+            "• Work even in pattern until desired length."
+        )
+
+    elif panel_type == "Back Panel":
+        sts_per_step = shaping.get("sts_per_step", "?")
+        first_knit = shaping.get("first_turn_stitch", "?")
+        purl_dist = shaping.get("purl_distance", "?")
+        
+        return (
+            "BACK PANEL SHAPING (German Short Rows):\n"
+            f"Row 0: Cast on {co_sts} stitches.\n\n"
+            f"Row 1 (RS): Knit {first_knit} sts. Make a double stitch and turn.\n"
+            f"Row 2 (WS): Purl {purl_dist} sts. Make a double stitch and turn.\n\n"
+            "Continue working back and forth. Each time you reach a double stitch,\n"
+            f"knit (or purl) it together as one stitch, then work {sts_per_step} more\n"
+            "stitches past it before turning.\n\n"
+            "Repeat this process until you reach the outer edges of the garment."
+        )
+        
+    elif panel_type == "Sleeve":
+        straight = shaping.get("straight_rows", "?")
+        dec_rate = shaping.get("dec_rate", "?")
+        
+        return (
+            "SLEEVE CONSTRUCTION:\n"
+            f"Pick up {co_sts} stitches evenly around the armhole.\n"
+            "Place a stitch marker (PM) at the center underarm to signify the\n"
+            "Beginning of Round (BOR).\n\n"
+            f"Knit {straight} rounds straight.\n\n"
+            "Decrease Round: Knit to 3 sts before SM, ssk, k1, SM, k1, k2tog.\n"
+            "(If knitting flat: Apply the same decreases 3 sts from the edges).\n\n"
+            f"Work a decrease round every {dec_rate} rounds until desired length."
+        )
+        
+    return ""
+
+def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint", rows_per_page=60, settings=None):
     figs = []
     
     # 1. INJECT THE CAST-ON EDGE
@@ -141,64 +200,70 @@ def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint"
 
     total_rows = len(matrix)
     total_sts = len(matrix[0])
+    co_sts = sum(1 for st in matrix[0] if st != -1) # Count cast-on stitches
     
+    pattern_row = next((y for y, row in enumerate(matrix) if 1 in row), None)
+    pattern_str = f"Row {pattern_row}" if pattern_row else "None included"
+
+    panel_name = title.split(" - ")[-1] if " - " in title else title
+    project_name = title.split(" - ")[0] if " - " in title else "Knitting Project"
+
+    if settings is None: settings = {}
+    gauge_sts = settings.get("gauge_sts", "?")
+    gauge_rows = settings.get("gauge_rows", "?")
+    size = settings.get("target_size", "?")
+    chest = settings.get("chest_cm", "?")
+
     # ==========================================
-    # PAGE 1: THE COVER & INSTRUCTION PAGE
+    # PAGE 1: TITLE & LEGEND (Standalone Cover)
     # ==========================================
     fig_cover, ax_cover = plt.subplots(figsize=(11, 8.5))
     ax_cover.axis('off')
     ax_cover.set_facecolor('#F9F9F9')
     
-    co_sts = sum(1 for st in matrix[0] if st != -1)
-    pattern_row = next((y for y, row in enumerate(matrix) if 1 in row), None)
-    pattern_str = f"Row {pattern_row}" if pattern_row else "None included"
-
-    if shaping_data and "mountain_rows" in shaping_data:
-        first_turn = shaping_data.get("first_turn_stitch", "?")
-        steps = shaping_data.get("total_short_row_steps", 1)
-        sts_per_step = shaping_data.get("sts_per_step", "?")
-        straight_rows = total_rows - shaping_data["mountain_rows"]
+    cover_text = (
+        f"🧶 {project_name.upper()}\n"
+        f"PANEL: {panel_name.upper()}\n"
+        "════════════════════════════════════════\n\n"
+        "PROJECT LEGEND & METRICS:\n"
+        f"• Target Size: {size} (Chest: {chest} cm)\n"
+        f"• Gauge: {gauge_sts} sts & {gauge_rows} rows per 10cm\n"
+        f"• Panel Start Width: {co_sts} sts\n"
+        f"• Panel Total Length: {total_rows} rows\n"
+        f"• Colorwork Starts: {pattern_str}\n"
+    )
         
-        instructions = (
-            f"🧶 {title.upper()}\n"
-            "════════════════════════════════════════\n\n"
-            "OVERALL SPECS:\n"
-            f"• Cast On: {co_sts} sts\n"
-            f"• Total Length: {total_rows} rows\n"
-            f"• Colorwork Starts: {pattern_str}\n\n"
-            
-            "⛰️ SHORT ROW SHAPING\n"
-            "Grey blocks represent empty space (no stitches knitted).\n\n"
-            
-            "RIGHT SHOULDER (Row 1):\n"
-            f"• Work {first_turn} sts, turn.\n"
-            f"• Next {steps - 1} turns: Work {sts_per_step} sts past last turn.\n\n"
-            
-            "LEFT SHOULDER (Row 2):\n"
-            f"• Work {first_turn} sts, turn.\n"
-            f"• Next {steps - 1} turns: Work {sts_per_step} sts past last turn.\n\n"
-            
-            "BODY PANEL:\n"
-            f"• Work even for {straight_rows} rows."
-        )
-    else:
-        instructions = (
-            f"🧶 {title.upper()}\n"
-            "════════════════════════════════════════\n\n"
-            "OVERALL SPECS:\n"
-            f"• Cast On: {co_sts} sts\n"
-            f"• Total Length: {total_rows} rows\n"
-            f"• Colorwork Starts: {pattern_str}\n\n"
-            "• Short row shaping is disabled for this panel."
-        )
-        
-    ax_cover.text(0.5, 0.6, instructions, va='center', ha='center', 
-                  fontsize=14, color='#222222', linespacing=1.8, fontfamily='sans-serif')
-    
+    ax_cover.text(0.5, 0.6, cover_text, va='center', ha='center', 
+                  fontsize=16, color='#222222', linespacing=1.8, fontfamily='sans-serif')
     figs.append(fig_cover)
 
     # ==========================================
-    # PAGES 2+: SLICING THE CHART INTO CHUNKS
+    # PAGE 2: INSTRUCTIONS (Standalone Text Page)
+    # ==========================================
+    if not shaping_data: shaping_data = {}
+    # Notice we now pass `co_sts` into the helper function!
+    shaping_instructions = get_panel_instructions(panel_name, shaping_data, co_sts) 
+    
+    if not shaping_instructions:
+        shaping_instructions = "• Shaping disabled or standard straight knitting."
+
+    fig_inst, ax_inst = plt.subplots(figsize=(11, 8.5))
+    ax_inst.axis('off')
+    ax_inst.set_facecolor('#FFFFFF')
+
+    inst_text = (
+        f"PATTERN INSTRUCTIONS: {panel_name.upper()}\n"
+        "════════════════════════════════════════\n\n"
+        f"{shaping_instructions}"
+    )
+
+    # Left-aligned and near the top for easy reading
+    ax_inst.text(0.1, 0.85, inst_text, va='top', ha='left', 
+                  fontsize=13, color='#222222', linespacing=1.8, fontfamily='sans-serif')
+    figs.append(fig_inst)
+
+    # ==========================================
+    # PAGES 3+: SLICING THE CHART INTO CHUNKS
     # ==========================================
     cmap = ListedColormap(['#C0C0C0', 'white', '#FF4B4B', '#FFB000'])
     
@@ -210,7 +275,6 @@ def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint"
         fig, ax = plt.subplots(figsize=(11, 8.5))
         ax.imshow(chunk_matrix, cmap=cmap, vmin=-1, vmax=2)
         
-        # 1. SOFT BASE GRID (The light background cells)
         ax.set_xticks(np.arange(-.5, total_sts, 1), minor=True)
         ax.set_yticks(np.arange(-.5, chunk_height, 1), minor=True)
         ax.grid(which="minor", color="#B0B0B0", linestyle='-', linewidth=0.5) 
@@ -218,59 +282,44 @@ def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint"
         ax.set_xticks([])
         ax.set_yticks([])
         
-        # 2. SUDOKU BLOCKS (Heavy lines every 5 blocks)
         sudoku_col='#595959'
-        # Outer Bounding Box
         ax.axvline(-0.5, color=sudoku_col, linewidth=2)
         ax.axvline(total_sts - 0.5, color=sudoku_col, linewidth=2)
         ax.axhline(-0.5, color=sudoku_col, linewidth=2)
         ax.axhline(chunk_height - 0.5, color=sudoku_col, linewidth=2)
         
-        # Heavy Vertical Lines (Boxing every 5 stitches left-to-right)
         for x in range(total_sts):
             if (x + 1) % 5 == 0 and (x + 1) < total_sts:
                 ax.axvline(x + 0.5, color=sudoku_col, linewidth=1.5)
                 
-        # Heavy Horizontal Lines (Absolute tracking across chunks)
         for local_y in range(chunk_height):
             abs_y = chunk_start + local_y
             if abs_y % 5 == 0 and abs_y != 0:
                 ax.axhline(local_y - 0.5, color=sudoku_col, linewidth=1.5)
         
-        # 3. STITCH NUMBERING (Now reads 1, 2, 3... from Left to Right)
         for x in range(total_sts):
             stitch_num = x + 1
-            # Print the number on the 1st stitch and every 5th stitch
             if stitch_num == 1 or stitch_num % 5 == 0:
-                # Top Label
                 ax.text(x, -0.8, str(stitch_num), va='bottom', ha='center', fontsize=8, color='#444444', fontweight='bold')
-                # Bottom Label
                 ax.text(x, chunk_height - 0.2, str(stitch_num), va='top', ha='center', fontsize=8, color='#444444', fontweight='bold')
 
-        # 4. ROW NUMBERING (With explicit RS/WS and moved Cast-On)
         for local_y in range(chunk_height):
             abs_y = chunk_start + local_y
-            
             if abs_y == 0:
-                # Moved to the left side (-1.0) 
                 ax.text(-1.0, local_y, "CO (WS)", va='center', ha='right', fontsize=9, fontweight='bold', color='#FFB000')
             elif abs_y <= 4 or abs_y % 5 == 0: 
                 if abs_y % 2 != 0: 
-                    # Odd Rows are RS: Label stays on the Right
                     ax.text(total_sts + 0.5, local_y, f"Row {abs_y} (RS)", va='center', ha='left', fontsize=8, color='#333333', fontweight='bold')
                 else:          
-                    # Even Rows are WS: Label explicitly moved to the Left
                     ax.text(-1.0, local_y, f"Row {abs_y} (WS)", va='center', ha='right', fontsize=8, color='#333333', fontweight='bold')
 
-        # 5. ASYMMETRICAL MOUNTAIN ARROW (If on this chunk)
-        if shaping_data and "mountain_rows" in shaping_data:
+        # --- NEW: Arrow Condition ---
+        # The blue dashed arrow will ONLY render if we are strictly on the Front Panel
+        if shaping_data and "mountain_rows" in shaping_data and "Front Panel" in panel_name:
             m_row = shaping_data["mountain_rows"]
-            
             if chunk_start <= m_row < chunk_end:
                 local_m_row = m_row - chunk_start
                 midpoint = total_sts // 2
-                
-                # We use the bold sudoku lines now, so just draw the yarn jump arrow!
                 ax.annotate('', 
                             xy=(midpoint, 1 - chunk_start), xycoords='data', 
                             xytext=(midpoint, local_m_row - 0.5), textcoords='data', 
