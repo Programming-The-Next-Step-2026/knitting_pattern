@@ -14,6 +14,17 @@ import io
 import json
 
 def get_hardcoded_heart():
+    """
+    Returns a predefined 2D matrix representing an 8-bit heart graphic.
+    
+    Returns:
+        list[list[int]]: A 2D array (matrix) of 1s and 0s.
+        
+    Example:
+        >>> matrix = get_hardcoded_heart()
+        >>> matrix[0]
+        [0, 1, 1, 0, 1, 1, 0]
+    """
     return [[0, 1, 1, 0, 1, 1, 0],
             [1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1],
@@ -21,22 +32,81 @@ def get_hardcoded_heart():
             [0, 0, 1, 1, 1, 0, 0],
             [0, 0, 0, 1, 0, 0, 0]]
 
-def scale_pattern_matrix_integer(original_matrix, multiplier):
-    if multiplier <= 1: return original_matrix
+def scale_pattern_matrix_integer(matrix, scale_factor):
+    """
+    Scales a 2D matrix by an integer factor without altering original memory references.
+    Each pixel becomes a block of scale_factor x scale_factor pixels.
+    
+    Args:
+        matrix (list[list[int]]): The original graphic matrix.
+        scale_factor (int): The integer multiplier to enlarge the matrix.
+        
+    Returns:
+        list[list[int]]: A newly instanced, scaled-up matrix.
+        
+    Example:
+        >>> matrix = [[1, 0], [0, 1]]
+        >>> scale_pattern_matrix_integer(matrix, 2)
+        [[1, 1, 0, 0], [1, 1, 0, 0], [0, 0, 1, 1], [0, 0, 1, 1]]
+    """
+    if scale_factor <= 1:
+        # Return a safe copy of the original matrix
+        return [row[:] for row in matrix]
+
     scaled_matrix = []
-    for row in original_matrix:
-        scaled_row = []
-        for pixel in row: scaled_row.extend([pixel] * int(multiplier))
-        for _ in range(int(multiplier)): scaled_matrix.append(scaled_row.copy()) 
+    for row in matrix:
+        # 1. Stretch the row horizontally
+        new_row = []
+        for pixel in row:
+            new_row.extend([pixel] * scale_factor)
+        
+        # 2. Stretch the row vertically (using .copy() to prevent memory smearing!)
+        for _ in range(scale_factor):
+            scaled_matrix.append(new_row.copy())
+            
     return scaled_matrix
 
 def rotate_matrix(matrix, degrees):
+    """
+    Rotates a 2D matrix mathematically by 90, 180, or 270 degrees.
+    
+    Args:
+        matrix (list[list[int]]): The matrix to rotate.
+        degrees (int): Rotation in degrees (0, 90, 180, 270).
+        
+    Returns:
+        list[list[int]]: The mathematically rotated matrix.
+        
+    Example:
+        >>> m = [[1, 2], [3, 4]]
+        >>> rotate_matrix(m, 90)
+        [[3, 1], [4, 2]]
+    """
     if degrees == 0 or not matrix: return matrix
     arr = np.array(matrix)
     k_map = {90: -1, 180: 2, 270: 1}
     return np.rot90(arr, k=k_map.get(degrees, 0)).tolist()
 
 def get_matrix_dimensions(matrix, t_type, axis, spacing_h=0, spacing_v=0):
+    """
+    Calculates the final width and height of a matrix after transforms are applied,
+    accounting for structural gaps or overlaps.
+    
+    Args:
+        matrix (list[list[int]]): The base matrix.
+        t_type (str): The transform type (e.g., 'Mirror', 'Flip').
+        axis (str): The transformation axis ('Horizontal', 'Vertical', 'Quadratic').
+        spacing_h (int, optional): Horizontal gap or overlap. Defaults to 0.
+        spacing_v (int, optional): Vertical gap or overlap. Defaults to 0.
+        
+    Returns:
+        tuple: (new_width, new_height)
+        
+    Example:
+        >>> m = [[1, 1]]
+        >>> get_matrix_dimensions(m, "Mirror", "Horizontal", spacing_h=1)
+        (5, 1)
+    """
     if t_type == "None" or not matrix: return len(matrix[0]), len(matrix)
     h, w = len(matrix), len(matrix[0])
     m = 2 if t_type == "Mirror" else 1
@@ -56,6 +126,24 @@ def get_matrix_dimensions(matrix, t_type, axis, spacing_h=0, spacing_v=0):
     return new_w, new_h
 
 def apply_transforms(matrix, t_type, axis, spacing_h=0, spacing_v=0):
+    """
+    Applies symmetry, flipping, and gap spacing to a graphical matrix.
+    
+    Args:
+        matrix (list[list[int]]): The base matrix to transform.
+        t_type (str): The transform type ('None', 'Flip', 'Mirror').
+        axis (str): The axis of transformation.
+        spacing_h (int, optional): Horizontal pixel distance. Defaults to 0.
+        spacing_v (int, optional): Vertical pixel distance. Defaults to 0.
+        
+    Returns:
+        list[list[int]]: The transformed matrix.
+        
+    Example:
+        >>> m = [[1, 0]]
+        >>> apply_transforms(m, "Flip", "Horizontal")
+        [[0, 1]]
+    """
     t_type = t_type.capitalize()
     if t_type == "None" or not matrix: return matrix
     arr = np.array(matrix)
@@ -96,6 +184,22 @@ def apply_transforms(matrix, t_type, axis, spacing_h=0, spacing_v=0):
     return matrix.tolist()
 
 def overlay_stamps_on_grid(sweater_grid, stamps):
+    """
+    Overlays a stack of graphical stamps onto a base sweater grid using absolute coordinates.
+    
+    Args:
+        sweater_grid (list[list[int]]): The mathematical grid of the garment panel.
+        stamps (list[dict]): A list of state dictionaries containing stamp parameters.
+        
+    Returns:
+        list[list[int]]: A unified matrix containing the garment shaping and layered graphics.
+        
+    Example:
+        >>> grid = [[0, 0], [0, 0]]
+        >>> stamps = [{"matrix": [[1]], "x": 0, "y": 0, "visible": True}]
+        >>> overlay_stamps_on_grid(grid, stamps)
+        [[1, 0], [0, 0]]
+    """
     res = np.array(copy.deepcopy(sweater_grid))
     grid_h, grid_w = res.shape
 
@@ -106,7 +210,6 @@ def overlay_stamps_on_grid(sweater_grid, stamps):
         if not base_matrix: continue
         
         final_stamp = rotate_matrix(base_matrix, stamp.get("rotation", 0))
-        # Pass both spacing_h and spacing_v
         final_stamp = apply_transforms(final_stamp, stamp.get("symmetry", "None"), stamp.get("axis", "Horizontal"), stamp.get("spacing_h", 0), stamp.get("spacing_v", 0))
         final_stamp = scale_pattern_matrix_integer(final_stamp, stamp.get("scale", 1))
         
@@ -131,7 +234,23 @@ def overlay_stamps_on_grid(sweater_grid, stamps):
     return res.tolist()
 
 def get_panel_instructions(panel_type, shaping, co_sts="?"):
-    """Generates the text instruction block for the PDF based on the panel type."""
+    """
+    Generates the text instruction block for the PDF based on the specific panel type.
+    
+    Args:
+        panel_type (str): The garment panel (e.g., 'Front Panel', 'Sleeve').
+        shaping (dict): Calculations generated by the math engine.
+        co_sts (int, optional): Total cast-on stitches. Defaults to "?".
+        
+    Returns:
+        str: A formatted multi-line string with human-readable knitting instructions.
+        
+    Example:
+        >>> shaping = {"first_turn_stitch": 5, "total_short_row_steps": 2, "sts_per_step": 3}
+        >>> text = get_panel_instructions("Front Panel", shaping, 50)
+        >>> "FRONT PANEL SHAPING" in text
+        True
+    """
     if not shaping: shaping = {}
         
     if panel_type == "Front Panel":
@@ -191,6 +310,25 @@ def get_panel_instructions(panel_type, shaping, co_sts="?"):
     return ""
 
 def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint", rows_per_page=60, settings=None):
+    """
+    Slices a garment matrix into printable chart chunks and renders Matplotlib Figures.
+    
+    Args:
+        matrix (list[list[int]]): The complete garment grid.
+        shaping_data (dict): Logic used to draw custom arrows or text.
+        title (str, optional): Project Title. Defaults to "Knitting Blueprint".
+        rows_per_page (int, optional): Pagination break limit. Defaults to 60.
+        settings (dict, optional): User metrics for the legend. Defaults to None.
+        
+    Returns:
+        list: A list of matplotlib.figure.Figure objects ready to be saved to PDF.
+        
+    Example:
+        >>> matrix = [[0, 0], [0, 0]]
+        >>> figs = generate_multipage_pdf_figs(matrix, {})
+        >>> len(figs) > 0 # Returns Title page, Instruction page, and Chart
+        True
+    """
     figs = []
     
     # 1. INJECT THE CAST-ON EDGE
@@ -241,7 +379,6 @@ def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint"
     # PAGE 2: INSTRUCTIONS (Standalone Text Page)
     # ==========================================
     if not shaping_data: shaping_data = {}
-    # Notice we now pass `co_sts` into the helper function!
     shaping_instructions = get_panel_instructions(panel_name, shaping_data, co_sts) 
     
     if not shaping_instructions:
@@ -257,7 +394,6 @@ def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint"
         f"{shaping_instructions}"
     )
 
-    # Left-aligned and near the top for easy reading
     ax_inst.text(0.1, 0.85, inst_text, va='top', ha='left', 
                   fontsize=13, color='#222222', linespacing=1.8, fontfamily='sans-serif')
     figs.append(fig_inst)
@@ -313,8 +449,6 @@ def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint"
                 else:          
                     ax.text(-1.0, local_y, f"Row {abs_y} (WS)", va='center', ha='right', fontsize=8, color='#333333', fontweight='bold')
 
-        # --- NEW: Arrow Condition ---
-        # The blue dashed arrow will ONLY render if we are strictly on the Front Panel
         if shaping_data and "mountain_rows" in shaping_data and "Front Panel" in panel_name:
             m_row = shaping_data["mountain_rows"]
             if chunk_start <= m_row < chunk_end:
@@ -333,8 +467,24 @@ def generate_multipage_pdf_figs(matrix, shaping_data, title="Knitting Blueprint"
     return figs
 
 def process_uploaded_image(pil_image, target_width, threshold_value):
-    """Converts an uploaded image into a binary matrix and a visual graph-paper preview."""
+    """
+    Converts a high-resolution PIL Image into a boolean matrix and high-contrast preview.
     
+    Args:
+        pil_image (PIL.Image): The user-uploaded image object.
+        target_width (int): The desired width in physical stitches.
+        threshold_value (int): The darkness threshold (1-255) for binarization.
+        
+    Returns:
+        tuple: (binary matrix list, PIL.Image high-contrast grid preview)
+        
+    Example:
+        >>> from PIL import Image
+        >>> img = Image.new('RGB', (100, 100), color='black')
+        >>> matrix, preview = process_uploaded_image(img, 10, 128)
+        >>> len(matrix[0]) == 10
+        True
+    """
     # 1. FIX TRANSPARENCY
     if pil_image.mode in ('RGBA', 'LA') or (pil_image.mode == 'P' and 'transparency' in pil_image.info):
         bg = Image.new('RGBA', pil_image.size, (255, 255, 255, 255))
@@ -357,58 +507,60 @@ def process_uploaded_image(pil_image, target_width, threshold_value):
     matrix = [[1 if val < threshold_value else 0 for val in row] for row in arr]
     
     # 5. BUILD THE HIGH-CONTRAST PREVIEW IMAGE
-    # 0 = Black (Pattern), 255 = White (Background)
     preview_arr = np.array([[0 if val == 1 else 255 for val in row] for row in matrix], dtype=np.uint8)
     preview_img = Image.fromarray(preview_arr)
-    
-    # Convert to RGB so we can draw colored/gray grid lines on it!
     preview_img = preview_img.convert("RGB")
     
-    # Scale it up by 10x
     cell_size = 10
     preview_img = preview_img.resize((target_width * cell_size, target_height * cell_size), Image.NEAREST)
     
     # 6. DRAW THE GRAPH PAPER GRID
     draw = ImageDraw.Draw(preview_img)
-    grid_color = (130, 130, 130) # Matching slate gray
+    grid_color = (130, 130, 130)
     
-    # Draw vertical grid lines
     for x in range(0, preview_img.width, cell_size):
         draw.line([(x, 0), (x, preview_img.height)], fill=grid_color, width=1)
-    # Draw horizontal grid lines
     for y in range(0, preview_img.height, cell_size):
         draw.line([(0, y), (preview_img.width, y)], fill=grid_color, width=1)
         
-    # Draw a thick bounding box around the whole thing
     draw.rectangle([(0, 0), (preview_img.width-1, preview_img.height-1)], outline=grid_color, width=2)
     
     return matrix, preview_img
 
 def generate_cropped_canvas_png_bytes(math_grid):
-    """Crops the composed canvas tightly around the pattern, adding a white background and grid."""
+    """
+    Crops the final matrix tightly to its boundaries and exports an in-memory PNG.
+    
+    Args:
+        math_grid (list[list[int]]): The final visual representation matrix.
+        
+    Returns:
+        bytes: Raw image byte data for Streamlit download buttons.
+        
+    Example:
+        >>> grid = [[0, 0], [0, 1]]
+        >>> output = generate_cropped_canvas_png_bytes(grid)
+        >>> isinstance(output, bytes)
+        True
+    """
     arr = np.array(math_grid)
-    # Find all coordinates where the pattern exists (1)
     coords = np.argwhere(arr == 1)
 
     if coords.size == 0:
-        # Fallback if canvas is empty
         img = Image.new('RGB', (100, 100), (255, 255, 255))
         buf = io.BytesIO()
         img.save(buf, format='PNG')
         return buf.getvalue()
 
-    # Get the bounding box of the combined pattern
     y_min, x_min = coords.min(axis=0)
     y_max, x_max = coords.max(axis=0)
     cropped = arr[y_min:y_max+1, x_min:x_max+1]
 
-    # Render: 255 (White) for background, Red for pattern
     img_arr = np.full((cropped.shape[0], cropped.shape[1], 3), 255, dtype=np.uint8)
     img_arr[cropped == 1] = [220, 50, 50]
 
     img = Image.fromarray(img_arr)
     
-    # Scale up by 10x and draw grid
     cell_size = 10
     img = img.resize((cropped.shape[1] * cell_size, cropped.shape[0] * cell_size), Image.NEAREST)
     draw = ImageDraw.Draw(img)
@@ -425,7 +577,20 @@ def generate_cropped_canvas_png_bytes(math_grid):
     return buf.getvalue()
 
 def merge_stamps(stamps_to_merge):
-    """Combines multiple stamps into a single matrix and calculates the new bounding box origin."""
+    """
+    Collapses multiple graphical layers into a single combined matrix.
+    
+    Args:
+        stamps_to_merge (list[dict]): The state dictionaries containing matrices.
+        
+    Returns:
+        tuple: (Combined matrix list, min_x offset, min_y offset)
+        
+    Example:
+        >>> stamps = [{"matrix": [[1]], "x": 1, "y": 1, "visible": True}]
+        >>> merge_stamps(stamps)
+        ([[1]], 1, 1)
+    """
     if not stamps_to_merge:
         return None, 0, 0
         
@@ -439,7 +604,6 @@ def merge_stamps(stamps_to_merge):
         base_matrix = stamp.get("matrix")
         if not base_matrix: continue
         
-        # Bake all transformations into the layer
         t_mat = rotate_matrix(base_matrix, stamp.get("rotation", 0))
         t_mat = apply_transforms(t_mat, stamp.get("symmetry", "None"), stamp.get("axis", "Horizontal"), stamp.get("spacing_h", 0), stamp.get("spacing_v", 0))
         t_mat = scale_pattern_matrix_integer(t_mat, stamp.get("scale", 1))
@@ -450,7 +614,6 @@ def merge_stamps(stamps_to_merge):
         
         stamp_data.append((arr, sx, sy, h, w))
         
-        # Find the absolute edges of the combined graphic
         min_x = min(min_x, sx)
         min_y = min(min_y, sy)
         max_x = max(max_x, sx + w)
@@ -458,23 +621,33 @@ def merge_stamps(stamps_to_merge):
         
     if not stamp_data: return None, 0, 0
     
-    # Create a blank local canvas just big enough to hold everything
     combined_h = max_y - min_y
     combined_w = max_x - min_x
     combined_canvas = np.zeros((combined_h, combined_w), dtype=int)
     
-    # Paste everything onto the local canvas using the calculated offsets
     for arr, sx, sy, h, w in stamp_data:
         local_y = sy - min_y
         local_x = sx - min_x
-        # Mask out transparent pixels so layers blend naturally
         mask = arr != 0
         combined_canvas[local_y:local_y+h, local_x:local_x+w][mask] = arr[mask]
         
     return combined_canvas.tolist(), min_x, min_y
 
 def crop_matrix_to_bounding_box(matrix):
-    """Crops a matrix to its tightest bounding box of 1s (for Alpha JSON exports)."""
+    """
+    Slices away empty transparent space around a graphic before JSON serialization.
+    
+    Args:
+        matrix (list[list[int]]): The raw, uncropped matrix.
+        
+    Returns:
+        list[list[int]]: The tightly cropped matrix.
+        
+    Example:
+        >>> matrix = [[0, 0], [0, 1]]
+        >>> crop_matrix_to_bounding_box(matrix)
+        [[1]]
+    """
     if not matrix: return []
     arr = np.array(matrix)
     coords = np.argwhere(arr != 0)
@@ -489,12 +662,22 @@ def crop_matrix_to_bounding_box(matrix):
 
 def serialize_project_state(project_data):
     """
-    Pure function: Converts the entire project dictionary (settings + stamps) into JSON.
+    Safely converts a complex dictionary containing NumPy arrays into a pure JSON string.
+    
+    Args:
+        project_data (dict): The complete active session state.
+        
+    Returns:
+        str: Serialized JSON payload.
+        
+    Example:
+        >>> state = {"settings": {}, "stamps": []}
+        >>> serialize_project_state(state)
+        '{"settings": {}, "stamps": []}'
     """
     safe_data = copy.deepcopy(project_data)
     safe_stamps = []
     
-    # Clean the numpy arrays out of the stamps
     for s in safe_data.get("stamps", []):
         if isinstance(s.get("matrix"), np.ndarray):
             s["matrix"] = s["matrix"].tolist()
@@ -505,15 +688,24 @@ def serialize_project_state(project_data):
 
 def deserialize_project_state(json_string):
     """
-    Pure function: Safely loads the project state, with backwards compatibility.
+    Parses a saved JSON string back into a Python dictionary, ensuring backwards compatibility.
+    
+    Args:
+        json_string (str): The uploaded save file contents.
+        
+    Returns:
+        dict: The structured Python dictionary payload.
+        
+    Example:
+        >>> payload = '{"settings": {}, "stamps": []}'
+        >>> type(deserialize_project_state(payload)) is dict
+        True
     """
     if not json_string:
         return {"settings": {}, "stamps": []}
         
     data = json.loads(json_string)
     
-    # Backwards compatibility: If you load an old save that was just a list of stamps, 
-    # it won't crash. It will just load the stamps and use default settings.
     if isinstance(data, list):
         return {"settings": {}, "stamps": data}
         

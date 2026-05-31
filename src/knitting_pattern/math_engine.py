@@ -21,6 +21,10 @@ def calculate_stitches(width_cm, gauge_sts_per_10cm):
 
     Returns:
         int: Total stitches needed, rounded up to the nearest whole integer.
+        
+    Example:
+        >>> calculate_stitches(50.0, 20.0)
+        100
     """
     sts_per_cm = gauge_sts_per_10cm / 10.0
     return math.ceil(width_cm * sts_per_cm)
@@ -35,6 +39,10 @@ def calculate_rows(length_cm, gauge_rows_per_10cm):
 
     Returns:
         int: Total rows needed, rounded up to the nearest whole integer.
+        
+    Example:
+        >>> calculate_rows(40.0, 25.0)
+        100
     """
     rows_per_cm = gauge_rows_per_10cm / 10.0
     return math.ceil(length_cm * rows_per_cm)
@@ -52,6 +60,11 @@ def get_standard_body_measurements(size_string):
 
     Returns:
         dict: Measurements for chest, back, arm length, bicep, and wrist.
+        
+    Example:
+        >>> measurements = get_standard_body_measurements("S")
+        >>> measurements["chest_circ_cm"]
+        86.0
     """
     body_sizes = {
         "XS": {"chest_circ_cm": 76.0, "cross_back_cm": 36.0, "arm_length_cm": 43.0, "bicep_circ_cm": 26.0, "wrist_circ_cm": 15.0},
@@ -73,6 +86,10 @@ def get_style_ease(garment_type):
     Returns:
         dict: Contains 'ease_cm' (float) to be added to the body circumference, 
               and a 'description' (str) of the fit.
+              
+    Example:
+        >>> get_style_ease("fitted_set_in")
+        {'ease_cm': 2.5, 'description': 'Tailored, close to body'}
     """
     ease_dict = {
         "drop_shoulder": {"ease_cm": 15.0, "description": "Loose, oversized fit"},
@@ -93,6 +110,10 @@ def calculate_garment_dimensions(size_string, garment_type, custom_ease=None):
 
     Returns:
         dict: Final calculated measurements for knitting the panel.
+        
+    Example:
+        >>> calculate_garment_dimensions("M", "drop_shoulder")
+        {'body_chest_circ': 96.0, 'ease_added': 15.0, 'total_garment_circ': 111.0, 'panel_width_cm': 55.5, 'arm_length_cm': 45.0, 'style_description': 'Loose, oversized fit'}
     """
     body = get_standard_body_measurements(size_string)
     style = get_style_ease(garment_type)
@@ -122,7 +143,11 @@ def get_shaping_guidelines(size_string):
         size_string (str): The desired standard size (e.g., "M").
 
     Returns:
-        guidelines (dict): Contains 'shoulder_drop_cm' and 'back_neck_raise_cm'.
+        dict: Contains 'shoulder_drop_cm' and 'back_neck_raise_cm'.
+        
+    Example:
+        >>> get_shaping_guidelines("M")
+        {'shoulder_drop_cm': 4.5, 'back_neck_raise_cm': 3.5}
     """
     guidelines = {
         "XS": {"shoulder_drop_cm": 3.5, "back_neck_raise_cm": 2.5},
@@ -144,7 +169,11 @@ def calculate_top_down_shoulder_shaping(total_chest_sts, size_string, gauge_rows
         gauge_rows_per_10cm (float): The knitter's row gauge.
         
     Returns:
-        dict: Calculations for shoulder short row shaping based on sizing 
+        dict: Calculations for shoulder short row shaping based on sizing.
+        
+    Example:
+        >>> calculate_top_down_shoulder_shaping(100, "M", 20.0)
+        {'mountain_rows': 9, 'total_short_row_steps': 4, 'first_turn_stitch': 25, 'middle_stitch': 50, 'sts_per_step': 6}
     """
     shaping_rules = get_shaping_guidelines(size_string)
 
@@ -167,6 +196,7 @@ def calculate_top_down_shoulder_shaping(total_chest_sts, size_string, gauge_rows
         "middle_stitch": middle_mark,
         "sts_per_step": sts_per_step
     }
+
 def calculate_back_neck_shaping(total_chest_sts, size_string, gauge_rows_per_10cm):
     """
     Calculates the short row intervals for top-down back short-row shaping.
@@ -177,7 +207,11 @@ def calculate_back_neck_shaping(total_chest_sts, size_string, gauge_rows_per_10c
         gauge_rows_per_10cm (float): The knitter's row gauge.
         
     Returns:
-        dict: Calculations for raising the back with short-row shaping
+        dict: Calculations for raising the back with short-row shaping.
+        
+    Example:
+        >>> calculate_back_neck_shaping(100, "M", 20.0)
+        {'mountain_rows': 7, 'total_short_row_steps': 3, 'middle_stitch': 50, 'neck_half_width': 16, 'sts_per_step': 11, 'first_turn_stitch': 66, 'purl_distance': 32}
     """
     shaping_rules = get_shaping_guidelines(size_string)
     raise_cm = shaping_rules["back_neck_raise_cm"]
@@ -208,7 +242,7 @@ def calculate_back_neck_shaping(total_chest_sts, size_string, gauge_rows_per_10c
         "neck_half_width": neck_half_width,
         "sts_per_step": sts_per_step,
         "first_turn_stitch": first_rs_knit, 
-        "purl_distance": ws_purl           
+        "purl_distance": ws_purl            
     }
 
 # ==========================================
@@ -224,22 +258,31 @@ def generate_panel_grid(width_sts, length_rows):
         length_rows (int): Total rows (Y-axis).
 
     Returns:
-        A 2D array filled with 0s.
+        list[list[int]]: A 2D array filled with 0s.
+        
+    Example:
+        >>> generate_panel_grid(3, 2)
+        [[0, 0, 0], [0, 0, 0]]
     """
     return [[0 for _ in range(width_sts)] for _ in range(length_rows)]
 
 def apply_top_down_mountains_to_grid(grid, shaping_data):
     """
-    Modifies the panel grid with assymetrical top-down short-row shaping.
-    The left shoulder shaping is delayed by 1 row compared to the right to make 
-    the chart more readable for short-row shaping.
+    Modifies the panel grid with asymmetrical top-down short-row shaping.
+    The left shoulder shaping is delayed by 1 row compared to the right.
     
     Args: 
-        grid (2D array): empty grid based on sizing.
-        shaping_data (): shoulder drop calculations
+        grid (list[list[int]]): Empty grid based on sizing.
+        shaping_data (dict): Shoulder drop calculations from the math engine.
         
     Returns: 
-        2D grid of 0s and -1s to account for shoulder short-row shaping.
+        list[list[int]]: Grid with -1s indicating unworked space.
+        
+    Example:
+        >>> grid = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+        >>> shaping = {"total_short_row_steps": 1, "first_turn_stitch": 1, "sts_per_step": 1}
+        >>> apply_top_down_mountains_to_grid(grid, shaping)
+        [[0, 0, 0, 0], [0, 0, -1, 0], [0, -1, -1, 0], [0, -1, 0, 0]]
     """
     steps = shaping_data["total_short_row_steps"]
     quarter = shaping_data["first_turn_stitch"]
@@ -249,50 +292,46 @@ def apply_top_down_mountains_to_grid(grid, shaping_data):
     midpoint = total_sts // 2
     
     # Row 0 is the full Cast-On. Shaping starts on Row 1.
-
     for step in range(steps):
-        # RIGHT SHOULDER (Starts immediately on Row 1)
         rs_row_1 = 1 + (step * 2)
         rs_row_2 = 2 + (step * 2)
         
-        # LEFT SHOULDER (Delayed by 1 row, starts Row 2)
         ls_row_1 = 2 + (step * 2)
         ls_row_2 = 3 + (step * 2)
         
         left_inner_edge = quarter + (step * sts_per_step)
         right_inner_edge = total_sts - left_inner_edge
         
-        # Carve RIGHT side of the neck (columns from midpoint to the right)
+        # Carve RIGHT side of the neck
         if rs_row_1 < len(grid):
-            for col in range(midpoint, right_inner_edge):
-                grid[rs_row_1][col] = -1
+            for col in range(midpoint, right_inner_edge): grid[rs_row_1][col] = -1
         if rs_row_2 < len(grid):
-            for col in range(midpoint, right_inner_edge):
-                grid[rs_row_2][col] = -1
+            for col in range(midpoint, right_inner_edge): grid[rs_row_2][col] = -1
 
-        # Carve LEFT side of the neck (columns from the left to midpoint)
+        # Carve LEFT side of the neck
         if ls_row_1 < len(grid):
-            for col in range(left_inner_edge, midpoint):
-                grid[ls_row_1][col] = -1
+            for col in range(left_inner_edge, midpoint): grid[ls_row_1][col] = -1
         if ls_row_2 < len(grid):
-            for col in range(left_inner_edge, midpoint):
-                grid[ls_row_2][col] = -1
+            for col in range(left_inner_edge, midpoint): grid[ls_row_2][col] = -1
 
     return grid
 
 def apply_back_short_rows_to_grid(grid, shaping_data):
     """ 
     Applies back neck short-row shaping to a garment panel grid. 
-    This function marks inactive stitches with -1 values to represent
-    the gradual raising of the back neckline using short rows. 
     
     Args: 
         grid (list[list[int]]): A 2D garment grid representing stitches and rows.
-        shaping_data (dict): Dictionary containing calculated short-row shaping
-        information, including neck width, stitch intervals, and shaping steps.
+        shaping_data (dict): Dictionary containing calculated short-row shaping.
         
     Returns: 
-        grid (list[list[int]]): Updated grid containing back neck short-row shaping. 
+        list[list[int]]: Updated grid containing back neck short-row shaping. 
+        
+    Example:
+        >>> grid = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+        >>> shaping = {"total_short_row_steps": 1, "middle_stitch": 2, "neck_half_width": 1, "sts_per_step": 1}
+        >>> apply_back_short_rows_to_grid(grid, shaping)
+        [[0, 0, 0, 0], [-1, 0, 0, -1], [-1, 0, 0, -1]]
     """
     steps = shaping_data["total_short_row_steps"]
     middle = shaping_data["middle_stitch"]
@@ -300,31 +339,23 @@ def apply_back_short_rows_to_grid(grid, shaping_data):
     sts_per_step = shaping_data["sts_per_step"]
     total_sts = len(grid[0])
     
-    # Row 0 is the full Cast-On sweep. Shaping starts on Row 1.
     for step in range(steps):
-        # Calculate the active turning points for this specific step
         left_turn = middle - neck_half_width - (step * sts_per_step)
         right_turn = middle + neck_half_width + (step * sts_per_step)
         
-        # Where did we leave off on the right side on the previous step?
-        # If it's the very first step, we started from the far right edge.
         prev_right_turn = total_sts - 1 if step == 0 else middle + neck_half_width + ((step - 1) * sts_per_step)
         
         rs_row = 1 + (step * 2)
         ws_row = 2 + (step * 2)
         
-        # Row 1 (RS): Knit from the right side down to the left_turn.
+        # Row 1 (RS)
         if rs_row < len(grid):
-            # Empty space left of the turn
             for col in range(0, left_turn): grid[rs_row][col] = -1
-            # Empty space right of where we started
             for col in range(prev_right_turn + 1, total_sts): grid[rs_row][col] = -1
             
-        # Row 2 (WS): Purl from the left_turn up to the right_turn.
+        # Row 2 (WS)
         if ws_row < len(grid):
-            # Empty space left of where we started
             for col in range(0, left_turn): grid[ws_row][col] = -1
-            # Empty space right of the turn
             for col in range(right_turn + 1, total_sts): grid[ws_row][col] = -1
 
     return grid
@@ -334,22 +365,22 @@ def calculate_sleeve_dimensions(size_string, gauge_sts_per_10cm, gauge_rows_per_
                                 straight_length_cm=15.0):
     """ 
     Calculates sleeve shaping dimensions for a tapered top-down sleeve.
-    The calculation includes stitch counts for the bicep and wrist,
-    total sleeve length, a straight upper-arm section, and the decrease frequency
-    required to taper evenly toward the wrist. 
     
     Args: 
         size_string (str): Standard body size used for baseline measurements. 
         gauge_sts_per_10cm (float): Stitch gauge measured over 10 cm. 
         gauge_rows_per_10cm (float): Row gauge measured over 10 cm. 
-        custom_bicep (float, optional): Custom bicep circumference in centimeters. Defaults to None. 
-        custom_wrist (float, optional): Custom wrist circumference in centimeters. Defaults to None. 
-        custom_length (float, optional): Custom sleeve length in centimeters. Defaults to None. 
-        straight_length_cm (float, optional): Length of the straight upper-arm section before tapering begins. Defaults to 15.0 cm. 
+        custom_bicep (float, optional): Custom bicep circumference. Defaults to None. 
+        custom_wrist (float, optional): Custom wrist circumference. Defaults to None. 
+        custom_length (float, optional): Custom sleeve length. Defaults to None. 
+        straight_length_cm (float, optional): Length of upper arm before taper. Defaults to 15.0 cm. 
         
     Returns: 
-        sleeve_data (dict): Calculated sleeve shaping data including stitch counts, row counts, 
-        decrease frequency, and taper information. 
+        dict: Calculated sleeve shaping data.
+        
+    Example:
+        >>> calculate_sleeve_dimensions("M", 20.0, 20.0, custom_bicep=30.0, custom_wrist=20.0, custom_length=45.0, straight_length_cm=10.0)
+        {'bicep_sts': 60, 'wrist_sts': 40, 'total_rows': 90, 'straight_rows': 20, 'dec_rate': 7, 'total_dec_rounds': 10}
     """
     body = get_standard_body_measurements(size_string)
     
@@ -357,15 +388,12 @@ def calculate_sleeve_dimensions(size_string, gauge_sts_per_10cm, gauge_rows_per_
     wrist_sts = calculate_stitches(custom_wrist or body["wrist_circ_cm"] + 2.0, gauge_sts_per_10cm)
     total_rows = calculate_rows(custom_length or body["arm_length_cm"], gauge_rows_per_10cm)
     
-    # Calculate rows for straight section
     straight_rows = calculate_rows(straight_length_cm, gauge_rows_per_10cm)
     taper_rows = total_rows - straight_rows
     
-    # Decrease Math: 1 stitch decreased on each side = -2 sts per decrease round
     total_sts_to_decrease = bicep_sts - wrist_sts
     decrease_rounds = total_sts_to_decrease // 2
     
-    # Frequency: How many rows between decrease rounds?
     dec_rate = taper_rows // decrease_rounds if decrease_rounds > 0 else 0
     
     return {
@@ -380,40 +408,37 @@ def calculate_sleeve_dimensions(size_string, gauge_sts_per_10cm, gauge_rows_per_
 def generate_sleeve_grid(sleeve_data):
     """ 
     Generates a 2D sleeve shaping grid for a tapered sleeve. 
-    The grid uses 0 values for active stitches and -1 values for removed stitches
-    as the sleeve narrows toward the wrist. 
     
     Args: 
-        sleeve_data (dict): Sleeve shaping calculations containing stitch counts,
-        row counts, taper frequency, and wrist sizing. 
+        sleeve_data (dict): Sleeve shaping calculations containing stitch counts.
         
     Returns: 
-        grid (list[list[int]]): A 2D grid representing the sleeve shaping layout. 
+        list[list[int]]: A 2D grid representing the sleeve layout with -1s for tapers. 
+        
+    Example:
+        >>> sleeve_data = {'bicep_sts': 4, 'wrist_sts': 2, 'total_rows': 3, 'straight_rows': 1, 'dec_rate': 1, 'total_dec_rounds': 1}
+        >>> generate_sleeve_grid(sleeve_data)
+        [[0, 0, 0, 0], [0, 0, 0, 0], [-1, 0, 0, -1]]
     """
     bicep = sleeve_data["bicep_sts"]
     rows = sleeve_data["total_rows"]
     straight_rows = sleeve_data["straight_rows"]
     dec_rate = sleeve_data["dec_rate"]
     
-    # Start with canvas filled with 0 (knittable)
     grid = [[0 for _ in range(bicep)] for _ in range(rows)]
     
     current_width = bicep
     
     for r in range(rows):
-        # 1. Zone 1 & 3: Straight sections (No decreases)
-        # 2. Zone 2: Taper section (Apply decreases every dec_rate rows)
         if r > straight_rows and dec_rate > 0 and (r - straight_rows) % dec_rate == 0:
             if current_width > sleeve_data["wrist_sts"]:
                 current_width -= 2
         
-        # Calculate how many stitches to 'empty out' (-1) on each side
         removed_total = bicep - current_width
         empty_on_each_side = removed_total // 2
         
         for c in range(empty_on_each_side):
-            grid[r][c] = -1 # Left side
-            grid[r][(bicep - 1) - c] = -1 # Right side
+            grid[r][c] = -1 
+            grid[r][(bicep - 1) - c] = -1 
             
     return grid
-

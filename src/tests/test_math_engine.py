@@ -152,10 +152,10 @@ def test_apply_back_short_rows_to_grid():
     }
     carved_grid = apply_back_short_rows_to_grid(grid, shaping_data)
     
-    # Outer edges on row 0 should be -1, inner neck should be 0
-    assert carved_grid[0][0] == -1  # Edge carved out
-    assert carved_grid[0][10] == 0  # Neck remains intact
-
+    # Verify the far left side (0) was carved
+    assert carved_grid[1][0] == -1
+    assert carved_grid[1][10] == 0
+    
 # ==========================================
 # 5. SLEEVE CALCULATION & GRID TESTS
 # ==========================================

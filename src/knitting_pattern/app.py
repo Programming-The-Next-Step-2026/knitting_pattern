@@ -51,7 +51,7 @@ if "proj_id" not in st.session_state: st.session_state.proj_id = 0
 # ==========================================
 st.set_page_config(page_title="Knit App", page_icon="🧶", layout="wide")
 st.title("Knitting Chart Maker")
-st.markdown("Transform any alpha pattern into a perfectly scaled, knittable chart.")
+st.markdown("Transform any alpha pattern into a knittable chart with instructions for a drop-shoulder sweater")
 
 # ==========================================
 # SIDEBAR: SETTINGS & MEASUREMENTS
@@ -357,11 +357,24 @@ else:
             st.session_state.active_stamp_idx = max(0, len(active_stamps) - 1)
             st.rerun()
     with c_exp:
-        t_mat = rotate_matrix(active_stamp["matrix"], active_stamp.get("rotation", 0))
-        t_mat = apply_transforms(t_mat, active_stamp.get("symmetry", "None"), active_stamp.get("axis", "Horizontal"), active_stamp.get("spacing_h", 0), active_stamp.get("spacing_v", 0))
-        cropped_mat = crop_matrix_to_bounding_box(t_mat)
-        st.download_button("💾 Export Alpha (JSON)", data=json.dumps(cropped_mat), file_name=f"{active_stamp['name'].replace(' ', '_')}_alpha.json", mime="application/json", use_container_width=True)
-
+        with st.expander("💾 Export JSON", expanded=False):
+            export_scaled = st.checkbox("Include Scale Multiplier?", value=False, help="Check this to download the physically enlarged matrix instead of the original size.")
+            
+            t_mat = rotate_matrix(active_stamp["matrix"], active_stamp.get("rotation", 0))
+            t_mat = apply_transforms(t_mat, active_stamp.get("symmetry", "None"), active_stamp.get("axis", "Horizontal"), active_stamp.get("spacing_h", 0), active_stamp.get("spacing_v", 0))
+            
+            # If the user checked the box, mathematically scale the matrix before saving it
+            if export_scaled and active_stamp.get("scale", 1) > 1:
+                t_mat = scale_pattern_matrix_integer(t_mat, active_stamp.get("scale", 1))
+                
+            cropped_mat = crop_matrix_to_bounding_box(t_mat)
+            st.download_button(
+                label="📥 Download JSON", 
+                data=json.dumps(cropped_mat), 
+                file_name=f"{active_stamp['name'].replace(' ', '_')}_alpha.json", 
+                mime="application/json", 
+                use_container_width=True
+            )
     st.write("---")
     
     # 3. MANUAL PIXEL EDITOR (The "Tweezers")
@@ -373,7 +386,7 @@ else:
         pk = st.session_state.proj_id
         idx = st.session_state.active_stamp_idx
 
-        # --- CSS HACK: Shrink the Data Editor rows and padding ---
+        # --- CSS  ---
         st.markdown("""
             <style>
             [data-testid="stDataEditor"] div {
@@ -391,7 +404,7 @@ else:
         df = pd.DataFrame(bool_matrix)
         
         # NEW: Force every column to be exactly 30 pixels wide (the smallest reliable checkbox size)
-        # We also use the index as a 'Row Number' so you don't get lost
+        # We also use the index as a 'Row Number'
         col_config = {
             column: st.column_config.CheckboxColumn(label="", width=20) 
             for column in df.columns
@@ -439,8 +452,21 @@ else:
             
             active_stamp["spacing_h"] = st.slider("Horizontal Spacing", -30, 30, int(active_stamp.get("spacing_h", 0)), key=f"sh_{idx}_{pk}_{active_panel}")
             active_stamp["spacing_v"] = st.slider("Vertical Spacing", -30, 30, int(active_stamp.get("spacing_v", 0)), key=f"sv_{idx}_{pk}_{active_panel}")
-            active_stamp["scale"] = st.slider("Scale", 1, 10, int(active_stamp.get("scale", 1)), key=f"sc_{idx}_{pk}_{active_panel}")
-
+            # --- BAKING SCALE SLIDER ---
+            col_sc_slide, col_sc_bake = st.columns([2.5, 1])
+            
+            with col_sc_slide:
+                active_stamp["scale"] = st.slider("Scale", 1, 10, int(active_stamp.get("scale", 1)), key=f"sc_{idx}_{pk}_{active_panel}")
+                
+            with col_sc_bake:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) # Pushes the button down to align with the slider
+                if st.button("🔨 Bake", use_container_width=True, help="Permanently enlarge the pixel matrix so you can edit the scaled pixels individually.", key=f"bake_{idx}_{pk}_{active_panel}"):
+                    if active_stamp["scale"] > 1:
+                        # Mathematically enlarge the matrix
+                        active_stamp["matrix"] = scale_pattern_matrix_integer(active_stamp["matrix"], active_stamp["scale"])
+                        # Reset the slider back to 1
+                        active_stamp["scale"] = 1
+                        st.rerun()
         # Wrap Position in a border
         with st.container(border=True):
             st.markdown("#### Position")
