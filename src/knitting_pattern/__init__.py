@@ -6,21 +6,32 @@ Created on Sun May 17 20:22:07 2026
 @author: kasteivanauskaite
 """
 
-from .example import add, calculate_mean
+# src/knitting_pattern/__init__.py
 
-# engine/__init__.py
-
-# This exposes these specific functions to the rest of your app
 from .math_engine import (
-    calculate_stitches, calculate_rows, calculate_garment_dimensions,
-    calculate_top_down_shoulder_shaping, generate_panel_grid, apply_top_down_mountains_to_grid,
-    calculate_back_neck_shaping, apply_back_short_rows_to_grid 
+    calculate_stitches, 
+    calculate_rows, 
+    calculate_garment_dimensions,
+    calculate_top_down_shoulder_shaping, 
+    generate_panel_grid, 
+    apply_top_down_mountains_to_grid, 
+    calculate_back_neck_shaping, 
+    apply_back_short_rows_to_grid
 )
 
-# Expose Image Engine Functions
 from .image_engine import (
     get_hardcoded_heart,
     scale_pattern_matrix_integer,
-    overlay_pattern_on_grid,
-    generate_chart_image
+    apply_transforms,
+    get_matrix_dimensions,
+    overlay_stamps_on_grid,
+    generate_multipage_pdf_figs,
+    process_uploaded_image,
+    rotate_matrix,
+    generate_cropped_canvas_png_bytes,
+    merge_stamps,
+    crop_matrix_to_bounding_box,
+    serialize_project_state,
+    deserialize_project_state
 )
+
