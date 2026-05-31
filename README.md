@@ -1,5 +1,4 @@
 
-```markdown
 # 🧶 Knit App
 
 ## About This Project
@@ -32,7 +31,7 @@ Before installing, ensure you have **Python 3.9 or newer** installed on your sys
    ```text
    [https://github.com/Programming-The-Next-Step-2026/knitting_pattern.git](https://github.com/Programming-The-Next-Step-2026/knitting_pattern.git)
 
-```
+
 
 4. Choose a local path on your computer and click **Clone**.
 5. Open your preferred terminal (or Anaconda Prompt) and navigate to the folder you just cloned.
