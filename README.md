@@ -8,17 +8,24 @@ Knit App is a comprehensive Streamlit-based application designed for knitters an
 
 ## Key Features
 * **Pattern Digitization:** Upload any PNG/JPG and use dynamic thresholding and resampling to convert it into a pixel matrix that you can layer onto a sweater canvas.
+  
 * **Multi-Panel Garment IDE:** Switch between Front Panel, Back Panel, and Sleeves canvases that make up a drop shoulder sweater. The app dynamically calculates dimensions and short-row shaping based on user measurements and gauge.
+  
 * **Layer Design Studio:** Add, duplicate, merge, and transform (rotate, flip, mirror, scale) multiple graphics on a single canvas.
+  
 * **Fine-Tune Pixel Editor:** A built-in, manual spreadsheet-style editor to fine-tune individual stitches or draw custom motifs from scratch on blank 25x25 or 50x50 canvases.
-* **Alpha JSON Exporter:** Export your custom design to a JSON file to reuse in future projects. 
+  
+* **Alpha JSON Exporter:** Export your custom design to a JSON file to reuse in future projects.
+  
 * **Master PDF Compiler:** Automatically chunks your digital canvas into a printable PDF pattern complete with cast-on counts, row instructions, and sweater specs.
+  
 * **Project Saving:** Serialize your entire workspace (including layers, settings, and math grids) into a JSON file to resume your work later.
 
+For more in depth documentation of the features check out docs/report.ipynb
 ---
 
 ## Prerequisites
-Before installing, ensure you have **Python 3.9 or newer** installed on your system. We highly recommend using a virtual environment (like `venv` or Anaconda) to keep dependencies clean.
+Before installing, ensure you have **Python 3.9 or newer** installed on your system.
 
 ---
 
