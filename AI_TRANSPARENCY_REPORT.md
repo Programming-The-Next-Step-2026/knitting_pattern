@@ -1,0 +1,26 @@
+# How I Used AI to Build Knit App (Transparency Log)
+
+I used a Large Language Model as a pair-programmer and technical sounding board throughout the development of Knit App. My goal was to bridge the gap between physical knitting concepts and Python data structures without getting bogged down in syntax. I did not ask the AI to "build a knitting app." Instead, I mapped out the architecture and used the LLM to speed up specific, isolated parts of the development cycle. Here is a detailed breakdown of how I integrated it into my workflow, how I maintained safe coding practices, and where I had to actively override its suggestions.
+
+### Scaffolding and Architectural Brainstorming
+
+I relied on the AI heavily during the initial architectural phase to translate physical textile manipulation into digital logic. For example, I knew I needed a way to represent physical short-row shaping—like a sloped drop shoulder or a scooped neckline—within a digital format. I prompted the AI to help me brainstorm how to map asymmetrical curves onto a 2D array using step intervals. This specific discussion directly led to the implementation of the matrix masking system in my math engine, where active knittable stitches are represented by `0` and dead space carved out for the neckline is represented by `-1`.
+
+I also used the AI to research and evaluate the most optimal Python packages for image manipulation. By discussing the constraints of knitting (which requires exact pixel representation rather than smooth gradients), we determined that utilizing NumPy arrays alongside Pillow's Box resampling algorithm was the best way to handle dynamic thresholding without introducing unwanted anti-aliasing.
+
+### Enforcing Safe Use Through Prompt Isolation
+
+If you feed an LLM an entire project at once, it will inevitably try to tightly couple the frontend UI with the backend logic, resulting in an unreadable "black box" codebase. To prevent this, I enforced a strict modular prompting strategy. I never exposed my Streamlit `app.py` file to the AI while working on the math algorithms. When I needed to write the logic for calculating garment dimensions based on standard body measurements and ease, I fed the AI isolated, pure math constraints. This ensured the AI couldn't hallucinate Streamlit `st.session_state` calls inside my math engine, preserving a strict separation of concerns across my files.
+
+Furthermore, I never blindly trusted the AI's spatial array logic, as LLMs are notoriously poor at spatial reasoning. When the AI helped draft the topographical loop that delays the left shoulder shaping by exactly one row to create an asymmetrical curve, I manually mapped the matrix indices on paper. I mathematically verified that a 4.5cm shoulder drop at a gauge of 20 rows per 10cm would accurately yield 9 short rows before I ever committed the code to my project.
+
+### Maintaining Developer Oversight and Overriding the AI
+
+Maintaining executive control was critical, especially when the AI prioritized standard programming patterns over the specific mathematical realities of a knitted garment. A major example of this occurred while building the Layer Design Studio. I needed a way to scale a graphic up by an integer factor (e.g., stretching a 2x2 pixel design into a 4x4 design). The AI provided a standard Python solution using list multiplication to duplicate the rows. However, when I implemented this, editing a single pixel in the Streamlit UI caused the edit to smear across the entire row. Because I maintained oversight of Python's memory management, I realized the AI's method had created shallow copies—multiple rows were pointing to the exact same memory address. I rejected the AI's code and rewrote the function myself to enforce `.copy()` on every appended row, ensuring each pixel remained an independent integer in memory.
+
+Later, during the testing phase, I used the AI to help scaffold my `pytest` framework and generate PEP 8 compliant docstrings with interactive `>>>` doctests. While trying to reach 100% test coverage on the math engine, the AI drafted a unit test for my `apply_back_short_rows_to_grid` function. When I ran the test locally, it failed with an `assert 0 == -1` error at the far edge of the matrix. I fed the traceback error back to the AI, and it attempted to fix the test by shifting the target column index from 19 to 18. When it failed again, I realized the AI was just blindly chasing a brittle assertion I looked at my actual algorithm, verified that the math for the short-row turn points was physically accurate for the mock sweater data, and recognized that the test itself was targeting a boundary that didn't matter. What helped was having the matrix of 0s and 1s visualised with the -1 for short row carvings. 
+
+### Conclusion
+
+I think I maintained boundaries and a balance with using LLMs for my project. I did most of the math myself to make sure it was correct, I kept prompts very specific and based on my own ideas and some provided background knowledge on the possibilities of implementation. The biggest addition of LLMs was probably the actual app interface, but I made sure to go through the code and understand what it was doing. 
+
